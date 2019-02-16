@@ -7,4 +7,4 @@ RentARoom is a simple discord bot for renting private channels for you and your 
 ## Starting bot
 You can [invite](https://discordapp.com/api/oauth2/authorize?client_id=543069086746411009&scope=bot&permissions=8) ready-to-use bot to your server
 
-or run yours one. Use `$ rent -appid <bot application id> -token <bot token>` 
+or run yours one. Use `$ Rent -appid <bot application id> -token <bot token>` 

@@ -19,27 +19,29 @@ type rentChannel struct {
 var rented = make(map[string]*rentChannel)
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
+	if m.Author.ID == s.State.User.ID &&
+		len(m.Mentions) != 0 &&
+		m.Mentions[0].ID != s.State.User.ID {
 		return
 	}
 
-	if len(m.Mentions) != 0 && m.Mentions[0].ID != s.State.User.ID {
+	channel, err := s.Channel(m.Message.ChannelID)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
-
-	channel, _ := s.Channel(m.Message.ChannelID)
 	if channel.Type != discordgo.ChannelTypeGuildText {
 		return
 	}
 	args := strings.Split(m.Message.Content, " ")
-	mention := "<@" + appID + ">"
+	mention := "<@" + *appID + ">"
 	if args[0] != mention {
 		return
 	}
 	help := mention + " is a simple discord bot for creating private channels for you and your friends." +
 		"This channel will be automatically deleted when you leave it.\n\n" +
 		"Usage:\n" +
-		mention + " `<size of channel>`\n\n"
+		mention + " `<size of channel>`. To increase user limit just send new size.\n\n"
 	if len(args) < 2 {
 		s.ChannelMessageSendEmbed(m.Message.ChannelID, &discordgo.MessageEmbed{
 			Description: help,
@@ -56,16 +58,20 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(m.Message.ChannelID, "Choose number between 2 and 100")
 		return
 	}
-	createChannel(s, channel, m.Message.Author, size)
+	err = createChannel(s, channel, m.Message.Author, size)
+	if err != nil {
+		fmt.Println(err)
+		s.ChannelMessageSend(channel.ID, "Something went wrong creating (editing) your channel")
+	}
 }
 
-func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.User, size int) {
+func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.User, size int) error {
 	elem, ok := rented[owner.ID]
 	if ok {
 		channel, err := s.Channel(elem.ID)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return err
 		}
 		_, err = s.ChannelEditComplex(channel.ID, &discordgo.ChannelEdit{
 			UserLimit: size,
@@ -73,10 +79,10 @@ func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.
 		})
 		if err != nil {
 			fmt.Println(err)
-			return
+			return err
 		}
 		s.ChannelMessageSend(c.ID, "Edited your rented channel")
-		return
+		return nil
 	}
 	channel, err := s.GuildChannelCreateComplex(c.GuildID, discordgo.GuildChannelCreateData{
 		Name:      owner.Username + "'s Channel",
@@ -84,8 +90,8 @@ func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.
 		UserLimit: size,
 	})
 	if err != nil {
-		s.ChannelMessageSend(c.ID, "Something went wrong creating your channel")
-		return
+
+		return err
 	}
 	s.ChannelMessageSend(c.ID, "Created channel for you")
 	rented[owner.ID] = &rentChannel{
@@ -98,4 +104,5 @@ func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.
 			s.ChannelDelete(rented[owner.ID].ID)
 		}
 	})
+	return nil
 }

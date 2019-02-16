@@ -10,18 +10,17 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-var token string
-var appID string
+var token = flag.String("token", "", "Bot token")
+var appID = flag.String("appid", "", "Application ID")
 
 func main() {
-	flag.StringVar(&token, "token", "", "Bot token")
-	flag.StringVar(&appID, "appid", "", "Application ID")
 	flag.Parse()
-	if token == "" || appID == "" {
-		fmt.Println("App ID and Token couldn't be empty")
+
+	if *token == "" || *appID == "" {
+		fmt.Println("App ID and Token must not be empty")
 		return
 	}
-	bot, err := discordgo.New("Bot " + token)
+	bot, err := discordgo.New("Bot " + *token)
 	if err != nil {
 		panic(err)
 	}
