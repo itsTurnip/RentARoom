@@ -19,8 +19,8 @@ type rentChannel struct {
 var rented = make(map[string]*rentChannel)
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID &&
-		len(m.Mentions) != 0 &&
+	if m.Author.ID == s.State.User.ID ||
+		len(m.Mentions) == 0 ||
 		m.Mentions[0].ID != s.State.User.ID {
 		return
 	}
@@ -35,7 +35,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	args := strings.Split(m.Message.Content, " ")
 	mention := "<@" + *appID + ">"
-	if args[0] != mention {
+	nickMention := "<@!" + *appID + ">"
+	if args[0] != mention && args[0] != nickMention {
 		return
 	}
 	help := mention + " is a simple discord bot for creating private channels for you and your friends." +
