@@ -28,16 +28,22 @@ func main() {
 	bot.AddHandler(messageCreate)
 
 	bot.AddHandler(func(s *discordgo.Session, vsu *discordgo.VoiceStateUpdate) {
-		channel, ok := rented[vsu.UserID]
+		rented.RLock()
+		channel, ok := rented.m[vsu.UserID]
+		rented.RUnlock()
 		if ok {
 			if vsu.ChannelID != channel.ID {
 				_, err := s.ChannelDelete(channel.ID)
 				if err != nil {
 					fmt.Println(err)
 				}
-				delete(rented, vsu.UserID)
+				rented.Lock()
+				delete(rented.m, vsu.UserID)
+				rented.Unlock()
 			} else {
+				rented.Lock()
 				channel.visited = true
+				rented.Unlock()
 			}
 		}
 	})
@@ -50,7 +56,7 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
-	for _, v := range rented {
+	for _, v := range rented.m {
 		bot.ChannelDelete(v.ID)
 	}
 	bot.Close()

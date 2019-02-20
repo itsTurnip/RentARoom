@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -16,7 +17,10 @@ type rentChannel struct {
 	visited bool
 }
 
-var rented = make(map[string]*rentChannel)
+var rented = struct {
+	m map[string]*rentChannel
+	sync.RWMutex
+}{m: make(map[string]*rentChannel)}
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID ||
@@ -67,7 +71,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.User, size int) error {
-	elem, ok := rented[owner.ID]
+	rented.RLock()
+	elem, ok := rented.m[owner.ID]
+	rented.RUnlock()
 	if ok {
 		channel, err := s.Channel(elem.ID)
 		if err != nil {
@@ -95,15 +101,24 @@ func createChannel(s *discordgo.Session, c *discordgo.Channel, owner *discordgo.
 		return err
 	}
 	s.ChannelMessageSend(c.ID, "Created channel for you")
-	rented[owner.ID] = &rentChannel{
+	rented.Lock()
+	rented.m[owner.ID] = &rentChannel{
 		owner:   owner.ID,
 		ID:      channel.ID,
 		visited: false,
 	}
+	rented.Unlock()
 	time.AfterFunc(20*time.Second, func() {
-		if !rented[owner.ID].visited {
-			s.ChannelDelete(rented[owner.ID].ID)
+		rented.RLock()
+		chann, ok := rented.m[owner.ID]
+		rented.RUnlock()
+		if ok && !chann.visited {
+			s.ChannelDelete(chann.ID)
+			rented.Lock()
+			delete(rented.m, owner.ID)
+			rented.Unlock()
 		}
+
 	})
 	return nil
 }
